@@ -1,0 +1,27 @@
+spring:
+  profiles:
+    active: dev
+  application:
+    name: ai-code-user
+  # session
+  session:
+    store-type: redis
+    # 30 days expire
+server:
+  port: 8124
+  servlet:
+    context-path: /api
+    # 30 days expire
+    session:
+      cookie:
+        max-age: 2592000
+# springdoc-openapi
+springdoc:
+  group-configs:
+    - group: 'default'
+      packages-to-scan: com.ai.codeplatform.controller
+# knife4j
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
