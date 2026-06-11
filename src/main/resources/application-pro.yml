@@ -1,0 +1,99 @@
+spring:
+  security:
+    #登录配置
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: ${GITHUB_CLIENT_ID}
+            client-secret: ${GITHUB_CLIENT_SECRET}
+            scope: read:user
+            redirect-uri: ${FRONTEND_HOME_PAGE_URL}/api/login/oauth2/code/github
+  #数据库配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${SPRING_MYSQL_URL}:${SPRING_MYSQL_PORT}/ai_code_platform?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8
+    username: root
+    password: ${SPRING_MYSQL_PASSWORD}
+  #redis配置
+  data:
+    redis:
+      username: default
+      ttl: 3600
+      database: 0
+      host: ${SPRING_REDIS_URL}
+      port: ${SPRING_REDIS_PORT}
+      password: ${SPRING_REDIS_PASSWORD}
+      timeout: 5000
+# AI
+langchain4j:
+  open-ai:
+    # 推理 AI 模型配置（用于复杂的推理任务）
+    reasoning-streaming-chat-model:
+      base-url: ${AI_BASE_URL}
+      api-key: ${AI_API_KEY}
+      model-name: ${AI_MODEL_NAME}
+      max-tokens: 62768
+      temperature: 0.7
+      log-requests: false
+      log-responses: true
+    # 智能路由 AI 模型配置（用于简单的分类任务）
+    routing-chat-model:
+      base-url: ${ROUTING_AI_BASE_URL}
+      api-key: ${ROUTING_AI_API_KEY}
+      model-name: ${ROUTING_AI_MODEL_NAME}
+      max-tokens: 100
+      temperature: 0.7
+      log-requests: false
+      log-responses: false
+    chat-model:
+      # 严格确保结构化输出生效
+#      strict-json-schema: true
+#      response-format: json_object
+      max-tokens: 8192
+      base-url: ${AI_BASE_URL}
+      api-key: ${AI_API_KEY}
+      model-name: ${AI_MODEL_NAME}
+      log-requests: false
+      log-responses: false
+      timeout: PT120S
+    streaming-chat-model:
+      max-tokens: 8192
+      base-url: ${AI_BASE_URL}
+      api-key: ${AI_API_KEY}
+      model-name: ${AI_MODEL_NAME}
+      log-requests: false
+      log-responses: true
+      timeout: PT120S
+cos:
+  client:
+    host: ${COS_HOST}
+    secretId: ${COS_SECRET_ID}
+    secretKey: ${COS_SECRET_KEY}
+    region: ${COS_REGION}
+    bucket: ${COS_BUCKET}
+
+# Pexels 图片搜索配置
+pexels:
+  api-key: ${PEXELS_API_KEY}
+
+# 阿里云 DashScope 配置
+dashscope:
+  api-key: ${DASHSCOPE_API_KEY}
+  image-model: wanx2.1-t2i-turbo
+
+#部署路径
+code:
+  deploy-path: http://www.icodeplay.site/dist
+
+# Qdrant 向量数据库配置
+qdrant:
+  host: ${QDRANT_URL}
+  port: ${QDRANT_PORT}
+  collection-name: code_embeddings
+  vector-size: 512  # BGE-Small-ZH-V1.5 的向量维度
+  distance-type: Cosine
+# 生产地址
+frontend:
+  homePageUrl: ${FRONTEND_HOME_PAGE_URL}
+  authUrl: ${FRONTEND_AUTH_URL}
