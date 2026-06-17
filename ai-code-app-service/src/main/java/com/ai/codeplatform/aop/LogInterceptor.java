@@ -6,11 +6,8 @@ import com.ai.codeplatform.annotation.LogRecord;
 import com.ai.codeplatform.common.BaseResponse;
 import com.ai.codeplatform.constant.UserConstant;
 import com.ai.codeplatform.exception.BusinessException;
-import com.ai.codeplatform.ai.model.entity.App;
 import com.ai.codeplatform.ai.model.entity.SysOperationLog;
 import com.ai.codeplatform.ai.model.entity.User;
-import com.ai.codeplatform.service.SysOperationLogService;
-import com.fasterxml.jackson.databind.ser.Serializers;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -20,6 +17,8 @@ import org.aspectj.lang.Signature;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -37,7 +36,7 @@ import java.util.stream.Collectors;
 @Aspect
 public class LogInterceptor {
     @Resource
-    private SysOperationLogService sysOperationLogService;
+    private RabbitTemplate rabbitTemplate;
     @Around("@annotation(logRecord)")
     public Object doInterceptor(ProceedingJoinPoint joinPoint, LogRecord logRecord) {
         Signature signature = joinPoint.getSignature();
@@ -172,9 +171,10 @@ public class LogInterceptor {
      * @param logInfo 日志信息
      */
     private void saveLog(SysOperationLog logInfo) {
-        boolean isSuccess = sysOperationLogService.save(logInfo);
-        if (!isSuccess){
-            log.error("接口调用日志写入数据库失败");
+        try {
+            rabbitTemplate.convertAndSend("log.topic","log.record",logInfo);
+        } catch (AmqpException e) {
+            log.error("日志记录生产者生产消息出错");
         }
     }
 

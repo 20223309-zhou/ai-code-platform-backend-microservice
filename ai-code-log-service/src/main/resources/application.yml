@@ -1,0 +1,38 @@
+spring:
+  profiles:
+    active: dev
+  application:
+    name: ai-code-log
+  # session
+  session:
+    store-type: redis
+    # 30 days expire
+    timeout: 2592000
+  rabbitmq:
+    listener:
+      simple:
+        prefetch: 1 # 每次只能获取一条消息，处理完成才能获取下一个消息
+        retry:
+          enabled: true        # 开启失败重试
+          max-attempts: 3      # 最多重试 3 次
+          initial-interval: 1000   # 首次重试间隔 1s
+          multiplier: 2.0      # 每次间隔翻倍
+          max-interval: 10000  # 最大间隔 10s
+server:
+  port: 8127
+  servlet:
+    context-path: /api
+    # 30 days expire
+    session:
+      cookie:
+        max-age: 2592000
+# springdoc-openapi
+springdoc:
+  group-configs:
+    - group: 'default'
+      packages-to-scan: com.ai.codeplatform.controller
+# knife4j
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn

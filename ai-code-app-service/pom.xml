@@ -18,6 +18,11 @@
     </properties>
 
     <dependencies>
+        <!-- Spring AMQP 对RabbitMQ的封装 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
         <!-- Redisson for distributed rate limiting -->
         <dependency>
             <groupId>org.redisson</groupId>
@@ -111,6 +116,7 @@
             <groupId>org.apache.dubbo</groupId>
             <artifactId>dubbo-nacos-spring-boot-starter</artifactId>
         </dependency>
+
 
     </dependencies>
 

@@ -34,7 +34,10 @@
             <artifactId>ai-code-common</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
-
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
         <!-- Dubbo -->
         <dependency>
             <groupId>org.apache.dubbo</groupId>

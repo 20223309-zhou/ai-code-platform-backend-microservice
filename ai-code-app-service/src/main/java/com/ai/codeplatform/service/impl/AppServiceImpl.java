@@ -11,7 +11,6 @@ import com.ai.codeplatform.ai.AiCodeGenTypeRoutingService;
 import com.ai.codeplatform.ai.AiCodeGenTypeRoutingServiceFactory;
 import com.ai.codeplatform.constant.AppConstant;
 import com.ai.codeplatform.core.AiCodeGeneratorFacade;
-import com.ai.codeplatform.innerservice.InnerScreenshotService;
 import com.ai.codeplatform.innerservice.InnerUserService;
 import com.ai.codeplatform.manager.CancelGenerationManager;
 import com.ai.codeplatform.core.builder.VueProjectBuilder;
@@ -41,6 +40,7 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -75,8 +75,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
 
-    @DubboReference
-    private InnerScreenshotService screenshotService;
+    @Resource
+    private RabbitTemplate rabbitTemplate;
 
     @Resource
     private ChatHistoryService chatHistoryService;
@@ -491,7 +491,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 10. 构建应用访问 URL
         String appDeployUrl = String.format("%s/%s/", deployHost, deployKey);
         // 11. 异步生成截图并更新应用封面
-        generateAppScreenshotAsync(appId, appDeployUrl);
+        rabbitTemplate.convertAndSend("screenshot.topic", "screenshot.generate", List.of(appId.toString(), appDeployUrl));
         return appDeployUrl;
     }
 
@@ -549,29 +549,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             log.error("模板文件复制失败：{}", e.getMessage());
         }
         return app.getId();
-    }
-
-    /**
-     * 异步生成应用截图并更新封面
-     *
-     * @param appId  应用ID
-     * @param appUrl 应用访问URL
-     */
-    @Override
-    public void generateAppScreenshotAsync(Long appId, String appUrl) {
-        // 使用虚拟线程异步执行
-        Thread.startVirtualThread(() -> {
-            // 调用截图服务生成截图并上传
-            String screenshotUrl = screenshotService.generateAndUploadScreenshot(appUrl);
-            // 更新应用封面字段
-            App updateApp = new App();
-            updateApp.setId(appId);
-            updateApp.setCover(screenshotUrl);
-            boolean updated = this.updateById(updateApp);
-            if (!updated) {
-                throw new BusinessException(ErrorCode.OPERATION_ERROR, "更新应用封面字段失败");
-            }
-        });
     }
 
     /**

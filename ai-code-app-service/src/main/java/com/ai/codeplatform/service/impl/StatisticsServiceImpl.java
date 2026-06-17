@@ -2,16 +2,16 @@ package com.ai.codeplatform.service.impl;
 
 
 import cn.hutool.json.JSONUtil;
+import com.ai.codeplatform.innerservice.InnerSysLogService;
 import com.ai.codeplatform.innerservice.InnerUserService;
 import com.ai.codeplatform.mapper.AppMapper;
-import com.ai.codeplatform.mapper.SysOperationLogMapper;
 import com.ai.codeplatform.ai.model.entity.App;
-import com.ai.codeplatform.ai.model.entity.SysOperationLog;
 import com.ai.codeplatform.ai.model.vo.StatisticsVO;
 import com.ai.codeplatform.service.StatisticsService;
 import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -41,8 +41,8 @@ public class StatisticsServiceImpl implements StatisticsService {
     @Resource
     private AppMapper appMapper;
 
-    @Resource
-    private SysOperationLogMapper sysOperationLogMapper;
+    @DubboReference
+    private InnerSysLogService innerSysLogService;
 
     @Override
     public StatisticsVO getStatistics() {
@@ -111,50 +111,23 @@ public class StatisticsServiceImpl implements StatisticsService {
      * 统计总App数量
      */
     private Long countTotalApps() {
-        return sysOperationLogMapper.selectCountByQuery(QueryWrapper.create()
-                .eq("operation","开始生成代码"));
+        return innerSysLogService.countTotalApps();
     }
 
     /**
      * 计算生成成功率
      */
     private Double calculateSuccessRate() {
-        Long totalCount = countTotalApps();
-        if (totalCount == 0) {
-            return 0.0;
-        }
-
-        QueryWrapper successWrapper = QueryWrapper.create()
-                .eq("status", "SUCCESS")
-                .eq("operation","开始生成代码");
-        Long successCount = sysOperationLogMapper.selectCountByQuery(successWrapper);
-
-        return (successCount.doubleValue() / totalCount.doubleValue()) * 100;
+        return innerSysLogService.calculateSuccessRate();
     }
 
     /**
      * 计算平均耗时（从创建到完成的平均时间）
      */
     private Double calculateAvgDuration() {
-        // 查询所有已完成的app，计算 createTime 到 completedTime 的平均耗时
-        QueryWrapper queryWrapper = QueryWrapper.create()
-                .eq("status", "SUCCESS")
-                .eq("operation","开始生成代码");
-        try {
-            List<SysOperationLog> completeApps = sysOperationLogMapper.selectListByQuery(queryWrapper);
-            if (completeApps == null || completeApps.isEmpty()) {
-                return 0.0;
-            }
-            // 计算每个应用生成的耗时（毫秒）
-            return completeApps.stream()
-                    .mapToDouble(log -> log.getDurationMs().doubleValue())
-                    .average()
-                    .orElse(0.0);
-        } catch (Exception e) {
-            log.warn("计算平均耗时失败", e);
-        }
-        return 0.0;
+        return innerSysLogService.calculateAvgDuration();
     }
+
     /**
      * 统计活跃用户数（本周有创作的用户）
      */
