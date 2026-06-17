@@ -30,7 +30,7 @@ dubbo:
   application:
     qos-enable: false
   registry:
-    address: nacos://${NACOS_URL}:${NACOS_PORT}:8848}?username=nacos&password=nacos
+    address: nacos://${NACOS_URL}:${NACOS_PORT:8848}?username=nacos&password=nacos
     register-mode: instance
   protocol:
     name: tri

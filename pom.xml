@@ -16,6 +16,7 @@
         <module>ai-code-ai</module>
         <module>ai-code-app-service</module>
         <module>ai-code-screenshot-service</module>
+        <module>ai-code-log-service</module>
     </modules>
 
     <properties>

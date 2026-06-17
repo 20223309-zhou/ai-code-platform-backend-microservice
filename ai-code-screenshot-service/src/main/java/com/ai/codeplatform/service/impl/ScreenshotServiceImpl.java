@@ -53,6 +53,7 @@ public class ScreenshotServiceImpl implements ScreenshotService {
                 throw new BusinessException(ErrorCode.OPERATION_ERROR, "截图上传对象存储失败");
             }
             log.info("网页截图生成并上传成功: {} -> {}", webUrl, cosUrl);
+
             return cosUrl;
         } finally {
             // 3. 清理本地文件

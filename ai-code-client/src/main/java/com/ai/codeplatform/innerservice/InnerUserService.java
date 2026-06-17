@@ -4,7 +4,6 @@ import com.ai.codeplatform.exception.BusinessException;
 import com.ai.codeplatform.exception.ErrorCode;
 import com.ai.codeplatform.ai.model.entity.User;
 import com.ai.codeplatform.ai.model.vo.UserVO;
-import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.Serializable;
 import java.util.Collection;

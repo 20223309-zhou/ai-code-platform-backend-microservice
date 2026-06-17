@@ -15,6 +15,13 @@ spring:
       port: ${SPRING_REDIS_PORT}
       password: ${SPRING_REDIS_PASSWORD}
       timeout: 5000
+  #RabbitMQ配置
+  rabbitmq:
+    host: ${RABBITMQ_URL} # 你的虚拟机IP
+    port: ${RABBITMQ_PORT} # 端口
+    virtual-host: ${RABBITMQ_VIRTUAL_HOST} # 虚拟主机
+    username: ${RABBITMQ_USUER_NAME} # 用户名
+    password: ${RABBITMQ_PASSWORD} # 密码
 # AI
 langchain4j:
   open-ai:

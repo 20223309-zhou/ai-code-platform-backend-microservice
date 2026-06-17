@@ -2,12 +2,12 @@ package com.ai.codeplatform.aop;
 
 import cn.hutool.core.util.ReflectUtil;
 import cn.hutool.json.JSONUtil;
+import com.ai.codeplatform.ai.model.entity.SysOperationLog;
+import com.ai.codeplatform.ai.model.entity.User;
 import com.ai.codeplatform.annotation.LogRecord;
 import com.ai.codeplatform.common.BaseResponse;
 import com.ai.codeplatform.constant.UserConstant;
 import com.ai.codeplatform.exception.BusinessException;
-import com.ai.codeplatform.ai.model.entity.SysOperationLog;
-import com.ai.codeplatform.ai.model.entity.User;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -172,7 +172,7 @@ public class LogInterceptor {
      */
     private void saveLog(SysOperationLog logInfo) {
         try {
-            rabbitTemplate.convertAndSend("log.topic","log.record",logInfo);
+            rabbitTemplate.convertAndSend("log.exchange","log.record",logInfo);
         } catch (AmqpException e) {
             log.error("日志记录生产者生产消息出错");
         }

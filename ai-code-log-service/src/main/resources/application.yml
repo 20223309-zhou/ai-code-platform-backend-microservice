@@ -2,7 +2,12 @@ spring:
   profiles:
     active: dev
   application:
-    name: ai-code-screenshot
+    name: ai-code-log
+  # session
+  session:
+    store-type: redis
+    # 30 days expire
+    timeout: 2592000
   rabbitmq:
     listener:
       simple:
@@ -14,8 +19,20 @@ spring:
           multiplier: 2.0      # 每次间隔翻倍
           max-interval: 10000  # 最大间隔 10s
 server:
-  port: 8126
+  port: 8127
   servlet:
     context-path: /api
-
-
+    # 30 days expire
+    session:
+      cookie:
+        max-age: 2592000
+# springdoc-openapi
+springdoc:
+  group-configs:
+    - group: 'default'
+      packages-to-scan: com.ai.codeplatform.controller
+# knife4j
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn

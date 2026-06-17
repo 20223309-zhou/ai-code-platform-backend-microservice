@@ -75,6 +75,7 @@ public class AppController {
      * @param request  请求
      * @param response 响应
      */
+    @AuthCheck(mustRole = UserConstant.DEFAULT_ROLE)
     @GetMapping("/download/{appId}")
     public void downloadAppCode(@PathVariable Long appId,
                                 HttpServletRequest request,
@@ -115,6 +116,7 @@ public class AppController {
      * @param request       请求
      * @return 应用 id
      */
+    @AuthCheck(mustRole = UserConstant.DEFAULT_ROLE)
     @LogRecord(description = "创建APP应用")
     @RateLimit(limitType = RateLimitType.USER, rate = 5, rateInterval = 60, message = "AI对话请求过于频繁，请稍后再试")
     @PostMapping("/add")
@@ -212,6 +214,7 @@ public class AppController {
      * @param request          请求
      * @return 更新结果
      */
+    @AuthCheck(mustRole = UserConstant.DEFAULT_ROLE)
     @PostMapping("/update")
     public BaseResponse<Boolean> updateApp(@RequestBody AppUpdateRequest appUpdateRequest, HttpServletRequest request) {
         if (appUpdateRequest == null || appUpdateRequest.getId() == null) {
