@@ -43,6 +43,20 @@ public class User implements Serializable {
     private String userAccount;
 
     /**
+     * 邮箱（统一小写归一化后存储）
+     */
+    @Column("email")
+    private String email;
+
+    /**
+     * 邮箱是否经本站验证：0 否，1 是
+     * 只有为 1 的邮箱才允许用于登录。
+     * OAuth / 存量用户无邮箱时为 0。
+     */
+    @Column("emailVerified")
+    private int emailVerified;
+
+    /**
      * GitHub ID（用于 OAuth 登录）
      */
     @Column("githubId")

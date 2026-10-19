@@ -39,6 +39,12 @@
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
         </dependency>
+        <!-- Redisson：限流（RateLimit 注解 / RedissonConfig）由各服务共用，故放在 common -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson</artifactId>
+            <version>3.50.0</version>
+        </dependency>
     </dependencies>
 
 

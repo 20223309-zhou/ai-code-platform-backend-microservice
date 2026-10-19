@@ -38,12 +38,25 @@ public class RateLimitAspect {
         String key = generateRateLimitKey(point, rateLimit);
         // 使用Redisson的分布式限流器，并为限流器设置key
         RRateLimiter rateLimiter = redissonClient.getRateLimiter(key);
-        rateLimiter.expire(Duration.ofHours(1)); // 1 小时后过期
-        // 设置限流器参数：每个时间窗口允许的请求数和时间窗口
-        rateLimiter.trySetRate(RateType.OVERALL, rateLimit.rate(), rateLimit.rateInterval(), RateIntervalUnit.SECONDS);
-        // 尝试获取令牌，如果获取失败则限流
-        if (!rateLimiter.tryAcquire(1)) {
-            throw new BusinessException(ErrorCode.TOO_MANY_REQUEST, rateLimit.message());
+        try {
+            rateLimiter.expire(Duration.ofHours(1)); // 1 小时后过期
+            // 设置限流器参数：每个时间窗口允许的请求数和时间窗口
+            rateLimiter.trySetRate(RateType.OVERALL, rateLimit.rate(), rateLimit.rateInterval(), RateIntervalUnit.SECONDS);
+        } catch (Exception e) {
+            // fail-open：限流组件故障不能把业务拖垮。
+            // 只有真正的「命中限流」才应该拦截请求，Redis 抖动/超时一律放行。
+            log.error("限流器初始化失败，放行本次请求, key: {}", key, e);
+            return;
+        }
+        try {
+            // 尝试获取令牌，如果获取失败则限流
+            if (!rateLimiter.tryAcquire(1)) {
+                throw new BusinessException(ErrorCode.TOO_MANY_REQUEST, rateLimit.message());
+            }
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("限流判断失败，放行本次请求, key: {}", key, e);
         }
     }
 

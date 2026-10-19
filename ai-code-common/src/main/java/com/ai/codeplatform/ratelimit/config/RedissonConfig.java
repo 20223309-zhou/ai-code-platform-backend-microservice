@@ -8,6 +8,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Redisson 客户端配置（限流用）。
+ * <p>
+ * 放在 common，app-service 与 user-service 共用同一份连接参数。
+ */
 @Configuration
 public class RedissonConfig {
 
