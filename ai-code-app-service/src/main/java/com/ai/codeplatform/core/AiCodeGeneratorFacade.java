@@ -95,6 +95,8 @@ public class AiCodeGeneratorFacade {
      * @return Flux<String> 流式响应
      */
     private Flux<String> processTokenStream(TokenStream tokenStream, Long appId) {
+        // 标记本轮生成中 AI 是否已自行调用构建工具（buildVueProject）
+        AtomicBoolean buildToolInvoked = new AtomicBoolean(false);
         return Flux.create(sink -> {
             tokenStream
                     .onPartialResponseWithContext((PartialResponse partialResponse, PartialResponseContext context) -> {
@@ -131,6 +133,10 @@ public class AiCodeGeneratorFacade {
                             sink.complete();
                             return;
                         }
+                        // 标记 AI 是否自行发起了构建
+                        if ("buildVueProject".equals(partialToolCall.name())) {
+                            buildToolInvoked.set(true);
+                        }
                         ToolExecutionRequest toolExecutionRequest = ToolExecutionRequest.builder()
                                 .id(partialToolCall.id())
                                 .name(partialToolCall.name())
@@ -155,9 +161,16 @@ public class AiCodeGeneratorFacade {
                             return;
                         }
                         cancelGenerationManager.remove(appId);
-                        String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                        vueProjectBuilder.buildProject(projectPath);
                         sink.complete();
+                        // 构建已改由 AI 通过 buildVueProject 工具自主触发（构建失败会把错误日志
+                        // 返回给 AI 分析修复）。兜底：本轮 AI 未调用构建工具时，异步构建一次，
+                        // 保证部署/预览不受影响。
+                        // 注意：必须是异步 + 放在 sink.complete() 之后，否则会把流式响应拖到构建结束。
+                        if (!buildToolInvoked.get()) {
+                            String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+                            log.info("本轮生成未调用构建工具，执行兜底异步构建, appId: {}", appId);
+                            vueProjectBuilder.buildProjectAsync(projectPath);
+                        }
                     })
                     .onError((Throwable error) -> {
                         cancelGenerationManager.remove(appId);

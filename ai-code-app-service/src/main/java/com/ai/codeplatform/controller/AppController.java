@@ -15,8 +15,10 @@ import com.ai.codeplatform.exception.BusinessException;
 import com.ai.codeplatform.exception.ErrorCode;
 import com.ai.codeplatform.innerservice.InnerUserService;
 import com.ai.codeplatform.manager.CancelGenerationManager;
+import com.ai.codeplatform.manager.CosManager;
 import com.ai.codeplatform.ai.model.dto.app.*;
 import com.ai.codeplatform.ai.model.entity.User;
+import com.ai.codeplatform.ai.model.enums.ModelEnum;
 import com.ai.codeplatform.ai.model.vo.AppVO;
 import com.ai.codeplatform.Interceptor.RagSwitchHolder;
 import com.ai.codeplatform.ratelimit.annotation.RateLimit;
@@ -42,6 +44,7 @@ import reactor.core.publisher.Mono;
 
 import java.io.File;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -67,6 +70,9 @@ public class AppController {
 
     @Resource
     private CancelGenerationManager cancelGenerationManager;
+
+    @Resource
+    private CosManager cosManager;
 
     /**
      * 下载应用代码
@@ -107,6 +113,31 @@ public class AppController {
         String downloadFileName = String.valueOf(appId);
         // 7. 调用通用下载服务
         projectDownloadService.downloadProjectAsZip(sourceDirPath, downloadFileName, response);
+    }
+
+    /**
+     * 获取模型列表
+     *
+     * @return 模型列表
+     */
+    @AuthCheck(mustRole = UserConstant.DEFAULT_ROLE)
+    @GetMapping("/model/list")
+    public BaseResponse<Map<String,Object>> modelList(){
+        Map<String, Object> modelMap = new HashMap<>();
+        ModelEnum grok = ModelEnum.getEnumByProvider("grok");
+        ModelEnum deepseek = ModelEnum.getEnumByProvider("deepseek");
+        ModelEnum chatgpt = ModelEnum.getEnumByProvider("chatgpt");
+        // 将模型信息添加到 map 中（default 为布尔值，标识默认模型）
+        if (deepseek != null) {
+            modelMap.put("deepseek", Map.<String, Object>of("modelName", deepseek.getModelName(), "label", deepseek.getLabel(), "default", true));
+        }
+        if (grok != null) {
+            modelMap.put("grok", Map.<String, Object>of("modelName", grok.getModelName(), "label", grok.getLabel(), "default", false));
+        }
+        if (chatgpt != null) {
+            modelMap.put("chatgpt", Map.<String, Object>of("modelName", chatgpt.getModelName(), "label", chatgpt.getLabel(), "default", false));
+        }
+        return ResultUtils.success(modelMap);
     }
 
     /**
@@ -274,7 +305,7 @@ public class AppController {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "删除应用失败");
         }
         // 异步删除应用目录和部署目录
-        Thread.ofVirtual().start(() -> deleteOutputDirAndDeployDir(oldApp));
+        Thread.ofVirtual().start(() -> cleanupAppResources(oldApp));
         return ResultUtils.success(result);
     }
 
@@ -387,7 +418,7 @@ public class AppController {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "应用删除失败");
         }
         // 异步删除应用目录和部署目录
-        Thread.ofVirtual().start(() -> deleteOutputDirAndDeployDir(oldApp));
+        Thread.ofVirtual().start(() -> cleanupAppResources(oldApp));
         return ResultUtils.success(result);
     }
 
@@ -505,8 +536,8 @@ public class AppController {
         return ResultUtils.success(deployUrl);
     }
 
-    // 删除应用输出目录和部署目录
-    private void deleteOutputDirAndDeployDir(App app) {
+    // 清理应用关联资源：本地输出目录、部署目录、COS 上的封面截图
+    private void cleanupAppResources(App app) {
         // 删除本地应用目录
         String dirName = app.getCodeGenType() + "_" + app.getId();
         String outputDir = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + dirName;
@@ -536,6 +567,16 @@ public class AppController {
                 } else {
                     log.info("删除应用部署文件成功，部署目录：{}", deployDir);
                 }
+            }
+        }
+        // 删除 COS 上的应用封面截图。
+        // cover 存的是 COS 对象 URL，不清理的话会永久残留（对象存储按量计费且无归属）。
+        if (StrUtil.isNotBlank(app.getCover())) {
+            boolean delCover = cosManager.deleteObjectByUrl(app.getCover());
+            if (delCover) {
+                log.info("删除应用封面成功，应用ID：{}", app.getId());
+            } else {
+                log.warn("删除应用封面失败或非本站地址，应用ID：{}，cover：{}", app.getId(), app.getCover());
             }
         }
     }

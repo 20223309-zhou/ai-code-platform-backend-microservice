@@ -28,14 +28,19 @@ import com.ai.codeplatform.ai.model.vo.AppVO;
 import com.ai.codeplatform.ai.model.vo.UserVO;
 import com.ai.codeplatform.rag.QdrantDocumentLoader;
 import com.ai.codeplatform.service.*;
+import com.ai.codeplatform.utils.SpringContextUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.ai.codeplatform.ai.model.entity.App;
 import com.ai.codeplatform.mapper.AppMapper;
+import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.Content;
 import dev.langchain4j.data.message.ImageContent;
+import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -119,49 +124,48 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         App app = new App();
         BeanUtil.copyProperties(appAddRequest, app);
         app.setUserId(loginUser.getId());
-        // 应用名称暂时为 initPrompt 前 12 位
-        app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
-        // ai智能选择代码生成类型
+        // 应用名由 AI 生成（失败自动降级为本地截取，不阻断创建）
+        app.setAppName(generateAppName(initPrompt));
+        // 代码生成类型：用户显式指定具体类型时直接使用（创建后不可更改）；
+        // 未指定或选择“智能选择(auto)”时，由 AI 根据 initPrompt 路由（保持原有默认行为）。
         AiCodeGenTypeRoutingService routingService = aiCodeGenTypeRoutingServiceFactory.createAiCodeGenTypeRoutingService();
-        CodeGenTypeEnum selectedCodeGenType = routingService.routeCodeGenType(initPrompt);
-        if (selectedCodeGenType == CodeGenTypeEnum.WARNING) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "禁止输入无关的提示词");
-        }
-        if (selectedCodeGenType == null) {
-            selectedCodeGenType = CodeGenTypeEnum.MULTI_FILE;
+        String reqCodeGenType = appAddRequest.getCodeGenType();
+        CodeGenTypeEnum specified = (reqCodeGenType != null) ? CodeGenTypeEnum.getEnumByValue(reqCodeGenType) : null;
+        CodeGenTypeEnum selectedCodeGenType;
+        if (specified != null && specified != CodeGenTypeEnum.WARNING) {
+            // 用户显式选择了具体生成类型，直接使用，不再走 AI 路由
+            selectedCodeGenType = specified;
+        } else {
+            // 智能选择 / 未指定 / 非法值：由 AI 路由，并做兜底
+            // 路由同样走 qwen 模型，与取名共用配额；限流/超时时必须降级，否则创建流程直接失败
+            try {
+                selectedCodeGenType = routingService.routeCodeGenType(initPrompt);
+            } catch (Exception e) {
+                log.warn("AI 路由生成类型失败，降级为 MULTI_FILE。原因: {}", e.toString());
+                selectedCodeGenType = CodeGenTypeEnum.MULTI_FILE;
+            }
+            if (selectedCodeGenType == CodeGenTypeEnum.WARNING || selectedCodeGenType == null) {
+                selectedCodeGenType = CodeGenTypeEnum.MULTI_FILE;
+            }
         }
         app.setCodeGenType(selectedCodeGenType.getValue());
-        // 使用 CAS 方式扣减额度（最多重试 3 次）
-        int maxRetry = 3;
-        boolean success = false;
-        for (int i = 0; i < maxRetry; i++) {
-            // 重新查询最新的用户信息
-            User currentUser = userService.getById(loginUser.getId());
-            if (currentUser == null) {
-                throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "用户不存在");
-            }
-
-            int currentQuota = currentUser.getQuota();
-            // 检查额度是否充足
-            if (currentQuota <= 0) {
-                throw new BusinessException(ErrorCode.OPERATION_ERROR, "额度不足，请充值后再试");
-            }
-
-            // CAS 扣减额度
-            // update user set quota = quota - 1 where id = ? and quota = ?
-            success = userService.deductQuota(currentUser.getId(), currentQuota);
-
-            if (success) {
-                log.info("用户 {} 额度扣减成功，原额度: {}, 新额度: {}", currentUser.getId(), currentQuota, currentQuota - 1);
-                break;
-            } else {
-                log.warn("用户 {} 额度扣减失败（并发冲突），第 {} 次重试", currentUser.getId(), i + 1);
-            }
+        // 前置校验：让额度不足的用户在插库前就拿到明确提示（此处读到的值只用于判断与日志，不参与扣减条件）
+        User quotaUser = userService.getById(loginUser.getId());
+        if (quotaUser == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "用户不存在");
         }
-
-        if (!success) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "系统繁忙，请稍后重试");
+        int quotaBefore = quotaUser.getQuota();
+        if (quotaBefore <= 0) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "额度不足，请充值后再试");
         }
+        // 单条原子 SQL 扣减（实现见 user-service 的 InnerUserService1Impl）。
+        // 并发请求会在该行排他锁上排队等待，锁释放后重新判断条件，不会失败，故无需重试。
+        boolean deducted = userService.deductQuota(loginUser.getId());
+        if (!deducted) {
+            // 影响行数为 0：并发下额度刚被其他请求扣完（前置校验通过、扣减时已不足）
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "额度不足，请充值后再试");
+        }
+        log.info("用户 {} 额度扣减成功，扣减前读到余额: {}", loginUser.getId(), quotaBefore);
         // 插入数据库
         boolean result = save(app);
         if (!result) {
@@ -169,6 +173,35 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         log.info("应用创建成功，ID: {}, 类型: {}", app.getId(), selectedCodeGenType.getValue());
         return app;
+    }
+
+    /**
+     * 使用 AI 生成应用名；失败时降级为本地截取。
+     * <p>
+     * 应用名只是"更好的默认值"（用户可在应用编辑页改名），
+     * 不能因为一次模型限流/超时就让整个创建流程失败。
+     */
+    private String generateAppName(String initPrompt) {
+        if (StrUtil.isBlank(initPrompt)) {
+            return "新应用";
+        }
+        try {
+            ChatModel chatModel = SpringContextUtil.getBean("routingChatModelPrototype", ChatModel.class);
+            List<ChatMessage> messages = List.of(
+                    new SystemMessage("你是一个应用名称生成器，用户会给你一个应用的初始提示词，你需要根据这个提示词生成一个简短、易记、与提示词相关的应用名称。"
+                            + "请确保名称不超过 10 个字符，并且去除换行和特殊字符。只输出应用名称，不要输出任何其他内容"),
+                    new UserMessage(initPrompt));
+            ChatResponse chatResponse = chatModel.chat(messages);
+            String appName = chatResponse.aiMessage().text();
+            if (StrUtil.isNotBlank(appName)) {
+                return appName;
+            }
+        } catch (Exception e) {
+            log.warn("AI 生成应用名失败，降级为本地截取。原因: {}", e.toString());
+        }
+        // 本地兜底：截取前 10 个字符，去除换行和特殊字符
+        String name = initPrompt.length() > 10 ? initPrompt.substring(0, 10) : initPrompt;
+        return name.replaceAll("[\\r\\n]", "").replaceAll("[^\\w\\s]", "");
     }
 
     /**

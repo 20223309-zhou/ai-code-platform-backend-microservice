@@ -31,8 +31,16 @@ public interface InnerUserService {
 
     // 获取当前登录用户VO
     UserVO getUserVO(User user);
-    // 扣减用户额度
-    boolean deductQuota(Long userId, int currentQuota);
+    /**
+     * 扣减用户额度。
+     * <p>
+     * 实现为单条原子 SQL（{@code UPDATE user SET quota = quota - 1 WHERE id = ? AND quota > 0}），
+     * 依托 InnoDB 行锁保证并发安全，不做应用层重试。
+     *
+     * @param userId 用户 id
+     * @return true 扣减成功；false 表示额度不足（影响行数为 0）
+     */
+    boolean deductQuota(Long userId);
 
     // 统计用户总数
     Long countTotalUsers();

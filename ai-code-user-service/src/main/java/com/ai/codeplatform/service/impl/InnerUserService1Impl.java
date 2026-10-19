@@ -36,12 +36,14 @@ public class InnerUserService1Impl implements InnerUserService {
     }
 
     @Override
-    public boolean deductQuota(Long userId, int currentQuota) {
+    public boolean deductQuota(Long userId) {
+        // 单条原子 SQL：quota = quota - 1 由数据库计算，条件用字面量 0。
+        // 并发请求会在该行的排他锁上排队等待，锁释放后重新判断条件，不会失败，故无需应用层重试。
         return userService.updateChain()
-                .set(User::getQuota, currentQuota - 1)
+                .setRaw(User::getQuota, "quota - 1")
                 .set(User::getUpdateTime, java.time.LocalDateTime.now())
                 .where(User::getId).eq(userId)
-                .and(User::getQuota).eq(currentQuota)
+                .and(User::getQuota).gt(0)
                 .update();
     }
 
