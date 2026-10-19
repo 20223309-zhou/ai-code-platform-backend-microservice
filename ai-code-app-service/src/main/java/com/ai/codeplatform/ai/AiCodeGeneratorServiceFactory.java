@@ -90,7 +90,10 @@ public class AiCodeGeneratorServiceFactory {
                 .id(appId)
                 .chatMemoryStore(redisChatMemoryStore)
                 // 对话记忆最大条数
-                .maxMessages(80000)
+                // 注意：不能设得过大。RedisChatMemoryStore.updateMessages 是「每条消息全量 setex」，
+                // 窗口越大单次写入体积越大（实测 200 条约 524KB），且每加一条都重写一次。
+                // 200 条已远超 32K 上下文能容纳的量，再大只会加重 Redis 写入负担。
+                .maxMessages(200)
                 .build();
         // 从数据库加载历史对话到记忆中
         chatHistoryOriginalService.loadOriginalChatHistoryToMemory(appId, chatMemory, 20);

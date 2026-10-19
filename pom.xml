@@ -24,8 +24,13 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-boot.version>3.5.3</spring-boot.version>
-        <spring-cloud.version>2023.0.1</spring-cloud.version>
-        <spring-cloud-alibaba.version>2023.0.1.0</spring-cloud-alibaba.version>
+        <!--
+            注意：原 spring-cloud-dependencies(2023.0.1) 与 spring-cloud-alibaba-dependencies(2023.0.1.0)
+            已移除。原因有二：
+            1) 各模块实际没有任何 spring-cloud-starter-* 依赖，两个 BOM 只声明未使用，属于死配置；
+            2) 2023.0.x 官方兼容 Spring Boot 3.2.x/3.3.x，与本项目 Boot 3.5.3 不匹配。
+            服务注册与调用走 Dubbo + Nacos（dubbo-spring-boot-starter），不依赖 Spring Cloud。
+        -->
         <dubbo.version>3.3.0</dubbo.version>
     </properties>
 
@@ -73,20 +78,6 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring-boot.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-dependencies</artifactId>
-                <version>${spring-cloud.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>com.alibaba.cloud</groupId>
-                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
-                <version>${spring-cloud-alibaba.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
