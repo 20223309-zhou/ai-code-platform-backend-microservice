@@ -84,12 +84,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-client</artifactId>
         </dependency>
-        <!-- langchain4j reactor 流式支持 -->
-        <dependency>
-            <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-reactor</artifactId>
-            <version>1.15.0-beta25</version>
-        </dependency>
     </dependencies>
 
 </project>

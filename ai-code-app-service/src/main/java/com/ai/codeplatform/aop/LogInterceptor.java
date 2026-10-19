@@ -172,6 +172,7 @@ public class LogInterceptor {
      */
     private void saveLog(SysOperationLog logInfo) {
         try {
+            // 将日志保存的信息传递给MQ
             rabbitTemplate.convertAndSend("log.topic","log.record",logInfo);
         } catch (AmqpException e) {
             log.error("日志记录生产者生产消息出错");
