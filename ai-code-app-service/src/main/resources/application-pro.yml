@@ -27,9 +27,15 @@ langchain4j:
   open-ai:
     # 推理 AI 模型配置（用于复杂的推理任务）
     reasoning-streaming-chat-model:
-      base-url: ${AI_BASE_URL}
-      api-key: ${AI_API_KEY}
-      model-name: ${AI_MODEL_NAME}
+      deepseek-base-url: ${AI_BASE_URL}
+      deepseek-api-key: ${AI_API_KEY}
+      deepseek-model-name: ${AI_MODEL_NAME}
+      # Grok / ChatGPT 共用的聚合网关
+      bblabu-base-url: ${BBLABU_BASE_URL:https://api.bblabu.ai/v1}
+      grok-api-key: ${GROK_API_KEY:}
+      grok-model-name: ${GROK_MODEL_NAME:grok-4.7}
+      chatgpt-api-key: ${CHATGPT_API_KEY:}
+      chatgpt-model-name: ${CHATGPT_MODEL_NAME:gpt-6.1-sol}
       max-tokens: 62768
       temperature: 0.7
       log-requests: false
@@ -95,3 +101,11 @@ qdrant:
   collection-name: code_embeddings
   vector-size: 512  # BGE-Small-ZH-V1.5 的向量维度
   distance-type: Cosine
+
+# 会话历史回放预算（冷启动重建对话记忆时用）
+app:
+  chat-history:
+    replay-max-tokens: ${CHAT_HISTORY_REPLAY_MAX_TOKENS:64000}
+    scan-limit: ${CHAT_HISTORY_SCAN_LIMIT:400}
+    keep-user-ai-rounds: ${CHAT_HISTORY_KEEP_USER_AI_ROUNDS:10}
+    keep-tool-rounds: ${CHAT_HISTORY_KEEP_TOOL_ROUNDS:3}

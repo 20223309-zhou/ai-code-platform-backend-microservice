@@ -43,14 +43,25 @@ public interface ChatHistoryOriginalService extends IService<ChatHistoryOriginal
     boolean deleteByAppId(Long appId);
 
     /**
-     * 将 APP 的对话历史加载到缓存中
+     * 将 APP 的对话历史加载到缓存中。
+     * <p>
+     * 按 token 预算回放（见 {@code app.chat-history} 配置），保证语义主线不丢。
      *
-     * @param appId
-     * @param chatMemory
-     * @param maxCount
-     * @return
+     * @param appId      应用 id
+     * @param chatMemory 对话记忆
+     * @return 实际加载的 record 数
      */
-    int loadOriginalChatHistoryToMemory(Long appId, MessageWindowChatMemory chatMemory, int maxCount);
+    int loadOriginalChatHistoryToMemory(Long appId, MessageWindowChatMemory chatMemory);
+
+    /**
+     * 将 APP 的对话历史加载到缓存中（可指定本次扫描的记录上限）
+     *
+     * @param appId     应用 id
+     * @param chatMemory 对话记忆
+     * @param scanLimit  扫描条数上限
+     * @return 实际加载的 record 数
+     */
+    int loadOriginalChatHistoryToMemory(Long appId, MessageWindowChatMemory chatMemory, int scanLimit);
 }
 
 
