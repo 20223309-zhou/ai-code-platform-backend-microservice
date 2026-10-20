@@ -5,6 +5,8 @@ spring:
     name: ai-code-app
   # session
   session:
+    redis:
+      namespace: ai-code:session
     store-type: redis
     # 30 days expire
     timeout: 2592000

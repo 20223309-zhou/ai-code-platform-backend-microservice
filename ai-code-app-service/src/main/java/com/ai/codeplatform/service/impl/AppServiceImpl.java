@@ -236,7 +236,10 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型");
         }
-        // 5.校验用户提示词的合法性（考虑上传的文件）
+        // 5.校验上传附件的合法性（类型 / 大小）
+        // 注：此处原有一段 routingService.isDesignRelated(intentMessage) 的「是否与网页相关」判断，
+        //    自单体 v4.8.1「支持自选应用生成类型」起已废弃（用户自己选生成类型，不再由 AI 猜），
+        //    且该判断无降级：一次 DNS 抖动就会让整个 chatToGenCode 500。微服务与单体保持一致，停用。
         AiCodeGenTypeRoutingService routingService = aiCodeGenTypeRoutingServiceFactory.createAiCodeGenTypeRoutingService();
         String intentMessage = message;
         if (files != null && files.length > 0) {
@@ -258,10 +261,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             else if (hasImage) intentMessage += " (用户上传了参考图片)";
             else if (hasText) intentMessage += " (用户上传了需求文档)";
         }
-        boolean designRelated = routingService.isDesignRelated(intentMessage);
-        if (!designRelated) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "请提供具体的网页修改需求或功能描述。");
-        }
+//        boolean designRelated = routingService.isDesignRelated(intentMessage);
+//        designRelated = true;
+//        if (!designRelated) {
+//            throw new BusinessException(ErrorCode.OPERATION_ERROR, "请提供具体的网页修改需求或功能描述。");
+//        }
 
         // 6. 构建用户消息内容列表
         List<Content> contents = new ArrayList<>();

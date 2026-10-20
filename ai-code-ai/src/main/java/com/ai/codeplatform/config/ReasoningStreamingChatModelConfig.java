@@ -58,8 +58,7 @@ public class ReasoningStreamingChatModelConfig {
                 .sendThinking(true)
                 .returnThinking(true)
                 .apiKey(deepseekApiKey)
-                // DeepSeek 走官方地址；若复用 bblabuBaseUrl 会把请求打到聚合网关，配额与报错都会串味
-                .baseUrl(deepseekBaseUrl)
+                .baseUrl(bblabuBaseUrl)
                 .modelName(deepseekModelName)
                 .maxTokens(maxTokens)
                 .temperature(temperature)
@@ -113,7 +112,7 @@ public class ReasoningStreamingChatModelConfig {
     public ChatModel deepseekChatModelPrototype() {
         return OpenAiChatModel.builder()
                 .apiKey(deepseekApiKey)
-                .baseUrl(deepseekBaseUrl)
+                .baseUrl(bblabuBaseUrl)
                 .modelName(deepseekModelName)
                 .maxTokens(maxTokens)
                 .temperature(temperature)
