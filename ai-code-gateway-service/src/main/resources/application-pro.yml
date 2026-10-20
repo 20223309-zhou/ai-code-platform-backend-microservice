@@ -7,18 +7,22 @@ spring:
       server:
         webflux:
           routes:
+            # app-service 提供：/app、/chatHistory、/static、/statistics、/health
             - id: ai-code-app-service
               uri: lb://ai-code-app
               predicates:
-                - Path=/api/app/**
+                - Path=/api/app/**,/api/chatHistory/**,/api/static/**,/api/statistics/**,/api/health/**
 
+            # user-service 只提供 /user
             - id: ai-code-user-service
               uri: lb://ai-code-user
               predicates:
-                - Path=/api/user/**,/api/chatHistory/**,/api/static/**,/api/statistics/**
+                - Path=/api/user/**
 
             - id: ai-code-log-service
               uri: lb://ai-code-log
               predicates:
                 - Path=/api/sysOperationLog/**
 
+            # 注意：/api/inner/** 是服务间内部接口（Feign 直连 lb://服务名），
+            # 故意不在此暴露，避免外部直接调用。
