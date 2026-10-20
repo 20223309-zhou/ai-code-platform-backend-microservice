@@ -1,18 +1,22 @@
-package com.ai.codeplatform.service.impl;
+package com.ai.codeplatform.controller;
 
 import com.ai.codeplatform.ai.model.entity.SysOperationLog;
-import com.ai.codeplatform.innerservice.InnerSysLogService;
+import com.ai.codeplatform.annotation.InnerApi;
 import com.ai.codeplatform.mapper.SysOperationLogMapper;
 import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.dubbo.config.annotation.DubboService;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 @Slf4j
-@DubboService
-public class InnerSysLogServiceImpl implements InnerSysLogService {
+@InnerApi
+@RestController
+@RequestMapping("/inner/sysLog")
+public class InnerSysLogController{
     @Resource
     private SysOperationLogMapper sysOperationLogMapper;
 
@@ -20,6 +24,7 @@ public class InnerSysLogServiceImpl implements InnerSysLogService {
      * 查询应用总数
      * @return
      */
+    @GetMapping("/countTotalApps")
     public Long countTotalApps(){
         return sysOperationLogMapper.selectCountByQuery(QueryWrapper.create()
                 .eq("operation","开始生成代码"));
@@ -29,6 +34,7 @@ public class InnerSysLogServiceImpl implements InnerSysLogService {
      * 计算应用生成成功率
      * @return
      */
+    @GetMapping("/calculateSuccessRate")
     public Double calculateSuccessRate(){
         Long totalCount = countTotalApps();
         if (totalCount == 0) {
@@ -47,6 +53,7 @@ public class InnerSysLogServiceImpl implements InnerSysLogService {
      * 计算应用生成的平均耗时
      * @return
      */
+    @GetMapping("/calculateAvgDuration")
     public Double calculateAvgDuration(){
         // 查询所有已完成的app，计算 createTime 到 completedTime 的平均耗时
         QueryWrapper queryWrapper = QueryWrapper.create()

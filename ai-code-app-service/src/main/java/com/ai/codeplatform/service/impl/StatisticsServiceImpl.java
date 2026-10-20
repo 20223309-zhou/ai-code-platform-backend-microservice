@@ -11,7 +11,6 @@ import com.ai.codeplatform.service.StatisticsService;
 import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -41,7 +40,7 @@ public class StatisticsServiceImpl implements StatisticsService {
     @Resource
     private AppMapper appMapper;
 
-    @DubboReference
+    @Resource
     private InnerSysLogService innerSysLogService;
 
     @Override

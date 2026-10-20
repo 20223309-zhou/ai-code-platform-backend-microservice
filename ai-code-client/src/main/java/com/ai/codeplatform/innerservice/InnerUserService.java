@@ -5,11 +5,13 @@ import com.ai.codeplatform.exception.ErrorCode;
 import com.ai.codeplatform.ai.model.entity.User;
 import com.ai.codeplatform.ai.model.vo.UserVO;
 import jakarta.servlet.http.HttpServletRequest;
-import java.io.Serializable;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.Collection;
 import java.util.List;
 import static com.ai.codeplatform.constant.UserConstant.USER_LOGIN_STATE;
-
+@FeignClient(value = "ai-code-user" ,path = "/api/inner/user")
 public interface InnerUserService {
 
     // 获取当前登录用户
@@ -23,25 +25,18 @@ public interface InnerUserService {
         return currentUser;
     }
 
-    // 根据id列表查询
-    List<User> listByIds(Collection<? extends Serializable> ids);
+    @GetMapping("/listByIds")
+    List<User> listByIds(@RequestParam("ids") Collection<Long> ids);
 
-    // 根据id查询
-    User getById(Serializable id);
+    @GetMapping("/{id}")
+    User getById(@PathVariable("id") Long id);
 
-    // 获取当前登录用户VO
-    UserVO getUserVO(User user);
-    /**
-     * 扣减用户额度。
-     * <p>
-     * 实现为单条原子 SQL（{@code UPDATE user SET quota = quota - 1 WHERE id = ? AND quota > 0}），
-     * 依托 InnoDB 行锁保证并发安全，不做应用层重试。
-     *
-     * @param userId 用户 id
-     * @return true 扣减成功；false 表示额度不足（影响行数为 0）
-     */
-    boolean deductQuota(Long userId);
+    @PostMapping("/vo")
+    UserVO getUserVO(@RequestBody User user);
 
-    // 统计用户总数
+    @PostMapping("/quota/deduct")
+    boolean deductQuota(@RequestParam("userId") Long userId);
+
+    @GetMapping("/count")
     Long countTotalUsers();
 }

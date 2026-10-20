@@ -44,7 +44,6 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -71,7 +70,7 @@ import static com.ai.codeplatform.constant.RagConstant.RAG_LOAD_DIRECTORY_PATH;
 @Slf4j
 @Service
 public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppService {
-    @DubboReference
+    @Resource
     private InnerUserService userService;
 
     @Resource

@@ -15,6 +15,10 @@ spring:
       port: ${SPRING_REDIS_PORT}
       password: ${SPRING_REDIS_PASSWORD}
       timeout: 5000
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_URL}:${NACOS_PORT}
   #RabbitMQ配置
   rabbitmq:
     host: ${RABBITMQ_URL} # 你的虚拟机IP
@@ -68,20 +72,6 @@ langchain4j:
       log-requests: false
       log-responses: true
       timeout: PT120S
-# Dubbo
-dubbo:
-  application:
-    qos-enable: false
-  registry:
-    address: nacos://${NACOS_URL}:${NACOS_PORT:8848}?username=nacos&password=nacos
-    register-mode: instance
-  protocol:
-    name: tri
-    port: 50053
-  consumer:
-    timeout: 120000
-  provider:
-    timeout: 120000
 
 #部署路径
 code:

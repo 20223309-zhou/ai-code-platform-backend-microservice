@@ -1,21 +1,28 @@
 package com.ai.codeplatform.innerservice;
 
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+
+@FeignClient(value = "ai-code-log", path = "/api/inner/sysLog")
 public interface InnerSysLogService {
     /**
      * 获取应用总数
      * @return Long
      */
-     Long countTotalApps();
+    @GetMapping("/countTotalApps")
+    Long countTotalApps();
 
     /**
      * 计算应用生成成功率
      * @return Double
      */
-     Double calculateSuccessRate();
+    @GetMapping("/calculateSuccessRate")
+    Double calculateSuccessRate();
 
     /**
      * 计算应用生成的平均耗时
      * @return Double
      */
-     Double calculateAvgDuration();
+    @GetMapping("/calculateAvgDuration")
+    Double calculateAvgDuration();
 }

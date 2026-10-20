@@ -18,6 +18,22 @@
     </properties>
 
     <dependencies>
+        <!--
+          Web + Knife4j 从父 pom 下移到 common：
+          common 里的 CorsConfig（WebMvcConfigurer）、IpUtils、GlobalExceptionHandler 都需要 Servlet/MVC 类，
+          其下游所有 MVC 服务也依赖 common，因此放在这里可覆盖它们；
+          gateway 不依赖 common，因此不会再被拖入 spring-webmvc（Gateway 是 WebFlux 栈，混入 MVC 会启动失败）。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- Knife4j OpenAPI3 Starter: Swagger 增强，提供 @Tag / @Operation / @Hidden 等注解与文档 UI -->
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+            <version>4.4.0</version>
+        </dependency>
         <!-- 腾讯云 COS 对象存储 -->
         <dependency>
             <groupId>com.qcloud</groupId>

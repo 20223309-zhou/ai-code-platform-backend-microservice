@@ -6,7 +6,10 @@ spring:
     virtual-host: ${RABBITMQ_VIRTUAL_HOST} # 虚拟主机
     username: ${RABBITMQ_USUER_NAME} # 用户名
     password: ${RABBITMQ_PASSWORD} # 密码
-
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_URL}:${NACOS_PORT}
 # 添加 COS 对象存储配置（需要从腾讯云获取）
 cos:
   client:
@@ -16,18 +19,5 @@ cos:
     region: ${COS_REGION}
     bucket: ${COS_BUCKET}
 
-# Dubbo
-dubbo:
-  application:
-    qos-enable: false
-  registry:
-    address: nacos://${NACOS_URL}:${NACOS_PORT:8848}?username=nacos&password=nacos
-    register-mode: instance
-  protocol:
-    name: tri
-    port: 50052
-  consumer:
-    timeout: 120000
-  provider:
-    timeout: 120000
+
 

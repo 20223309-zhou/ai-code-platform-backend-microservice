@@ -15,6 +15,10 @@ spring:
       port: ${SPRING_REDIS_PORT}
       password: ${SPRING_REDIS_PASSWORD}
       timeout: 5000
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_URL}:${NACOS_PORT}
   #RabbitMQ配置
   rabbitmq:
     host: ${RABBITMQ_URL} # 你的虚拟机IP

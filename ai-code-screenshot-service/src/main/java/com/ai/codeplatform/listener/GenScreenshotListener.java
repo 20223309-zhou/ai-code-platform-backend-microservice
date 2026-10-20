@@ -6,7 +6,6 @@ import com.ai.codeplatform.exception.ErrorCode;
 import com.ai.codeplatform.innerservice.InnerAppService;
 import com.ai.codeplatform.service.ScreenshotService;
 import jakarta.annotation.Resource;
-import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.amqp.core.ExchangeTypes;
 import org.springframework.amqp.rabbit.annotation.Exchange;
 import org.springframework.amqp.rabbit.annotation.Queue;
@@ -21,7 +20,7 @@ import java.util.List;
 public class GenScreenshotListener {
     @Resource
     private ScreenshotService screenshotService;
-    @DubboReference
+    @Resource
     private InnerAppService innerAppService;
 
     @RabbitListener(bindings = @QueueBinding(

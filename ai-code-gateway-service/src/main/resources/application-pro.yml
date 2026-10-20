@@ -1,0 +1,24 @@
+spring:
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_URL}:${NACOS_PORT}
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: ai-code-app-service
+              uri: lb://ai-code-app
+              predicates:
+                - Path=/api/app/**
+
+            - id: ai-code-user-service
+              uri: lb://ai-code-user
+              predicates:
+                - Path=/api/user/**,/api/chatHistory/**,/api/static/**,/api/statistics/**
+
+            - id: ai-code-log-service
+              uri: lb://ai-code-log
+              predicates:
+                - Path=/api/sysOperationLog/**
+

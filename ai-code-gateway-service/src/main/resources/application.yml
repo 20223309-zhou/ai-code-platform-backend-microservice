@@ -1,0 +1,7 @@
+server:
+  port: 8100
+spring:
+  application:
+    name: ai-code-gateway
+  profiles:
+    active: dev

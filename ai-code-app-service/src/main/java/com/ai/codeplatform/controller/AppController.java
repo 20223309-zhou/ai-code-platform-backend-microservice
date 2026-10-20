@@ -31,7 +31,6 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.MediaType;
@@ -62,7 +61,7 @@ public class AppController {
     @Resource
     private AppService appService;
 
-    @DubboReference
+    @Resource
     private InnerUserService userService;
 
     @Resource
