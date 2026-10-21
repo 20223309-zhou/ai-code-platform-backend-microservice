@@ -10,7 +10,6 @@ import com.ai.codeplatform.service.ChatHistoryOriginalService;
 import com.ai.codeplatform.utils.SpringContextUtil;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
@@ -18,6 +17,7 @@ import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.skills.Skills;
+import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -30,8 +30,12 @@ import java.time.Duration;
 @Configuration
 public class AiCodeGeneratorServiceFactory {
 
+    /**
+     * 注接口而非具体类：实际 Bean 是 CompressingChatMemoryStore（压缩 + 写入容错），
+     * 内部委托 RedisChatMemoryStore。
+     */
     @Resource
-    private RedisChatMemoryStore redisChatMemoryStore;
+    private ChatMemoryStore chatMemoryStore;
 
     @Resource
     private ChatHistoryOriginalService chatHistoryOriginalService;
@@ -86,11 +90,11 @@ public class AiCodeGeneratorServiceFactory {
         MessageWindowChatMemory chatMemory = MessageWindowChatMemory
                 .builder()
                 .id(appId)
-                .chatMemoryStore(redisChatMemoryStore)
+                .chatMemoryStore(chatMemoryStore)
                 // 对话记忆最大条数
-                // 注意：不能设得过大。RedisChatMemoryStore.updateMessages 是「每条消息全量 setex」，
-                // 窗口越大单次写入体积越大（实测 200 条约 524KB），且每加一条都重写一次。
-                // 200 条已远超 32K 上下文能容纳的量，再大只会加重 Redis 写入负担。
+                // 注意：不能设得过大。记忆是「读全量 → 追加 → 全量写回」，窗口越大单次写入体积越大
+                // （实测 200 条约 524KB），且每加一条都重写一次。现在写回前会把历史的读类工具结果
+                // 压成摘要（见 CompressingChatMemoryStore），但窗口本身仍不宜放大。
                 .maxMessages(200)
                 .build();
         // 从数据库加载历史对话到记忆中
