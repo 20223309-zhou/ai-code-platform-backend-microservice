@@ -9,26 +9,22 @@ spring:
             client-secret: ${GITHUB_CLIENT_SECRET}
             scope: read:user
             redirect-uri: ${FRONTEND_HOME_PAGE_URL}/api/login/oauth2/code/github
-  # mysql
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${SPRING_MYSQL_URL}:${SPRING_MYSQL_PORT}/ai_code_platform?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: ${SPRING_MYSQL_PASSWORD}
-  # redis
-  data:
-    redis:
-      username: default
-      ttl: 3600
-      database: 0
-      host: ${SPRING_REDIS_URL}
-      port: ${SPRING_REDIS_PORT}
-      password: ${SPRING_REDIS_PASSWORD}
-      timeout: 5000
   cloud:
     nacos:
-      discovery:
+      config:
+        namespace: ${NACOS_NAMESPACE:11260589-83b9-47fd-a21f-1ec9819553d6}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
         server-addr: ${NACOS_URL}:${NACOS_PORT}
+        file-extension: yml
+      discovery:
+        namespace: ${NACOS_NAMESPACE:11260589-83b9-47fd-a21f-1ec9819553d6}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        server-addr: ${NACOS_URL}:${NACOS_PORT}
+  # MySQL / Redis 统一走 Nacos 远程配置，本地不再重复声明
+  config:
+    import:
+      - nacos:shared-jdbc-pro.yml
+      - nacos:shared-redis-pro.yml
   # 邮件配置（邮箱注册验证码）
   # password 必须填邮箱服务商给出的「授权码」，不是邮箱登录密码
   # 端口与加密必须配对：465 → MAIL_SSL_ENABLE=true；587 → false + 需在 properties 里开 starttls
