@@ -5,12 +5,16 @@ import dev.langchain4j.rag.DefaultRetrievalAugmentor;
 import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.rag.content.injector.DefaultContentInjector;
 import jakarta.annotation.Resource;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
 /**
- * 检索增强器配置
+ * 检索增强器配置。受 {@code app.rag.enabled} 控制；
+ * 关闭时不存在 RetrievalAugmentor bean，AiCodeGeneratorServiceFactory 会用 null 跳过 RAG。
  */
 @Configuration
+@ConditionalOnProperty(prefix = "app.rag", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class AugmentorConfig {
 
     @Resource

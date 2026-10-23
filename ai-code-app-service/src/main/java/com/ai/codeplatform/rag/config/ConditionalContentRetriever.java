@@ -6,11 +6,17 @@ import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import dev.langchain4j.rag.query.Query;
 import jakarta.annotation.Resource;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * 带请求级开关的检索器包装。受 {@code app.rag.enabled} 控制，
+ * 关闭时整个 bean 不创建（它硬依赖 retriever，retriever 不存在就会注入失败）。
+ */
 @Component
+@ConditionalOnProperty(prefix = "app.rag", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class ConditionalContentRetriever implements ContentRetriever {
 
     @Resource

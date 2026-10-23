@@ -13,6 +13,7 @@ import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
@@ -22,8 +23,15 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * 把知识库目录切分、向量化后写入 Qdrant。
+ * <p>
+ * 受 {@code app.rag.enabled} 控制：关闭 RAG 时不注册该 bean，
+ * 调用方（RagInitializer / AppServiceImpl）均已做空判断。
+ */
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "app.rag", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class QdrantDocumentLoader {
 
     @Resource

@@ -89,3 +89,6 @@ app:
     scan-limit: ${CHAT_HISTORY_SCAN_LIMIT:400}
     keep-user-ai-rounds: ${CHAT_HISTORY_KEEP_USER_AI_ROUNDS:10}
     keep-tool-rounds: ${CHAT_HISTORY_KEEP_TOOL_ROUNDS:3}
+  # 知识库检索（RAG）总开关。
+  rag:
+    enabled: ${APP_RAG_ENABLED:true}

@@ -9,16 +9,21 @@ import io.qdrant.client.grpc.Collections;
 import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Qdrant 向量数据库配置
+ * Qdrant 向量数据库配置。
+ * <p>
+ * 受 {@code app.rag.enabled} 控制：关闭 RAG 时不连 Qdrant，
+ * 避免「向量库没启动 / glibc 不满足」连带把整个服务拖死。
  */
 @Data
 @Configuration
 @ConfigurationProperties(prefix = "qdrant")
+@ConditionalOnProperty(prefix = "app.rag", name = "enabled", havingValue = "true", matchIfMissing = true)
 @Slf4j
 public class QdrantConfig {
     

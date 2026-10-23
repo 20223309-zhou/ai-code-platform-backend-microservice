@@ -86,4 +86,14 @@
         </dependency>
     </dependencies>
 
+    <build>
+        <plugins>
+            <!-- 声明即生效：继承根 pom pluginManagement 里的 version 与 repackage execution -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>

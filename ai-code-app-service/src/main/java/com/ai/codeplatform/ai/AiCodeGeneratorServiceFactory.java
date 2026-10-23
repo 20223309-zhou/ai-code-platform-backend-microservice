@@ -23,6 +23,7 @@ import dev.langchain4j.skills.Skills;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -48,7 +49,13 @@ public class AiCodeGeneratorServiceFactory {
     @Resource
     private ToolManager toolManager;
 
-    @Resource
+    /**
+     * RAG 检索增强器。
+     * 可空：{@code app.rag.enabled=false} 时整条 RAG 链（embeddingModel / retriever /
+     * augmentor）都不会创建 —— 典型场景是老系统的 glibc < 2.27 加载不了 onnxruntime 原生库。
+     * 此时 {@link #withRag} 会跳过设置，AI 服务照常工作，只是没有知识库检索。
+     */
+    @Autowired(required = false)
     private RetrievalAugmentor retrievalAugmentor;
 
     @Resource
@@ -136,9 +143,8 @@ public class AiCodeGeneratorServiceFactory {
             case VUE_PROJECT -> {
                 // 使用多例模式的 StreamingChatModel 解决并发问题
                 StreamingChatModel reasoningStreamingChatModel = resolveStreamingChatModel(modelName);
-                yield AiServices.builder(AiCodeGeneratorService.class)
+                yield withRag(AiServices.builder(AiCodeGeneratorService.class)
                         .streamingChatModel(reasoningStreamingChatModel)
-                        .retrievalAugmentor(retrievalAugmentor)
                         .toolProvider(skills.toolProvider())
                         .chatMemoryProvider(memoryId -> chatMemory)
                         .tools(toolManager.getAllTools())
@@ -146,43 +152,54 @@ public class AiCodeGeneratorServiceFactory {
                         .inputGuardrails(new PromptSafetyInputGuardrail())
                         .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                                 toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
-                        ))
+                        )))
                         .build();
             }
             case HTML -> {
                 // 使用多例模式的 StreamingChatModel 解决并发问题
                 StreamingChatModel openAiStreamingChatModel = resolveStreamingChatModel(modelName);
-                yield AiServices.builder(AiCodeGeneratorService.class)
+                yield withRag(AiServices.builder(AiCodeGeneratorService.class)
                         .chatModel(resolveChatModel(modelName))
                         .toolProvider(skills.toolProvider())
                         .streamingChatModel(openAiStreamingChatModel)
-                        .retrievalAugmentor(retrievalAugmentor)
                         .chatMemoryProvider(memoryId -> chatMemory)
                         .tools(new WebFetchTool(), new FileReadTool(),
                                 new FileModifyTool(), searchImageTool, generateLogoTool)
                         // 添加输入护轨
-                        .inputGuardrails(new PromptSafetyInputGuardrail())
+                        .inputGuardrails(new PromptSafetyInputGuardrail()))
                         .build();
             }
             case MULTI_FILE -> {
                 // 使用多例模式的 StreamingChatModel 解决并发问题
                 StreamingChatModel multiStreamingChatModel = resolveStreamingChatModel(modelName);
-                yield AiServices.builder(AiCodeGeneratorService.class)
+                yield withRag(AiServices.builder(AiCodeGeneratorService.class)
                         .chatModel(resolveChatModel(modelName))
                         .toolProvider(skills.toolProvider())
                         .streamingChatModel(multiStreamingChatModel)
-                        .retrievalAugmentor(retrievalAugmentor)
                         .chatMemoryProvider(memoryId -> chatMemory)
                         .tools(new WebFetchTool(), new FileReadTool(),
                                 new FileModifyTool(), new FileWriteTool(),
                                 searchImageTool, generateLogoTool)
                         // 添加输入护轨
-                        .inputGuardrails(new PromptSafetyInputGuardrail())
+                        .inputGuardrails(new PromptSafetyInputGuardrail()))
                         .build();
             }
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR,
                     "不支持的代码生成类型: " + codeGenType.getValue());
         };
+    }
+
+    /**
+     * RAG 可用时挂上检索增强器，不可用时原样返回（AI 服务照常工作，只是不检索知识库）。
+     * ⚠️ 不能写成 {@code .retrievalAugmentor(null)}：langchain4j 的 setter 内部是
+     * {@code ensureNotNull(retrievalAugmentor, "retrievalAugmentor")}，传 null 会直接抛
+     * {@code IllegalArgumentException}，所以只能在不存在时**不调用**该方法。
+     */
+    private AiServices<AiCodeGeneratorService> withRag(AiServices<AiCodeGeneratorService> builder) {
+        if (retrievalAugmentor != null) {
+            builder.retrievalAugmentor(retrievalAugmentor);
+        }
+        return builder;
     }
 
     /**

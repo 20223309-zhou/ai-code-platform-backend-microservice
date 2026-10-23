@@ -45,6 +45,7 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -100,7 +101,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private ChatHistoryOriginalService chatHistoryOriginalService;
 
-    @Resource
+    /**
+     * RAG 文档加载器。可空：{@code app.rag.enabled=false} 时该 bean 不存在
+     * （典型场景是老系统 glibc < 2.27，加载不了 onnxruntime 原生库）。
+     */
+    @Autowired(required = false)
     private QdrantDocumentLoader qdrantDocumentLoader;
 
     @Value("${code.deploy-path:http://localhost}")
@@ -505,8 +510,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                         // 把部署文件复制到知识库目录
                         FileUtil.copyContent(new File(sourceDirPath), new File(filePath), true);
                         // 对部署文件做向量转化和存储
-                        qdrantDocumentLoader.loadDocuments(filePath);
-                        log.info("向量转换成功，转换目录: {}", filePath);
+                        if (qdrantDocumentLoader == null) {
+                            log.warn("RAG 已关闭（app.rag.enabled=false），跳过向量化: {}", filePath);
+                        } else {
+                            qdrantDocumentLoader.loadDocuments(filePath);
+                            log.info("向量转换成功，转换目录: {}", filePath);
+                        }
                     } catch (IORuntimeException e) {
                         log.error("向量转换失败，转换目录: {}", filePath);
                     }

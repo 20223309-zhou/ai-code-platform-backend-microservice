@@ -107,11 +107,30 @@
                     <parameters>true</parameters>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
         </plugins>
+        <!--
+          只做「登记」不做「执行」：
+          pluginManagement 里的插件对任何模块都不生效，必须由模块自己声明 <plugin> 才启用。
+          这样只有 5 个带引导类的服务模块会 repackage 成可执行 fat jar，
+          common / model / client / ai 四个纯库模块保持普通 jar（找不到 main class 也 repackage 会报错）。
+          注意：repackage goal 不会因为插件被声明就自动执行，必须显式绑定 <executions>。
+        -->
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
     </build>
 
 </project>

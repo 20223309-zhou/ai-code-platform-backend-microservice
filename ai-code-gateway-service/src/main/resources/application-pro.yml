@@ -2,6 +2,8 @@ spring:
   cloud:
     nacos:
       discovery:
+        namespace: ${NACOS_NAMESPACE:11260589-83b9-47fd-a21f-1ec9819553d6}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
         server-addr: ${NACOS_URL}:${NACOS_PORT}
     gateway:
       server:

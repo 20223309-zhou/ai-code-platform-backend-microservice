@@ -5,12 +5,18 @@ import dev.langchain4j.model.embedding.onnx.bgesmallzhv15.BgeSmallZhV15Embedding
 import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import jakarta.annotation.Resource;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import static dev.langchain4j.store.embedding.filter.MetadataFilterBuilder.metadataKey;
 
+/**
+ * 向量检索器。整个类受 {@code app.rag.enabled} 控制；
+ * 关闭时不会创建 retriever，也就不会触发 embeddingModel 的原生库加载。
+ */
 @Configuration
+@ConditionalOnProperty(prefix = "app.rag", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class RetrieverConfig {
     @Resource
     private EmbeddingStore<TextSegment> embeddingStore;
