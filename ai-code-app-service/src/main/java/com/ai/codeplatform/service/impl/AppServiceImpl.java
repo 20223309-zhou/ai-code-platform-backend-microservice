@@ -48,7 +48,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
 
@@ -101,12 +101,20 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private ChatHistoryOriginalService chatHistoryOriginalService;
 
+    @Resource
+    private TransactionTemplate transactionTemplate;
     /**
      * RAG 文档加载器。可空：{@code app.rag.enabled=false} 时该 bean 不存在
      * （典型场景是老系统 glibc < 2.27，加载不了 onnxruntime 原生库）。
      */
     @Autowired(required = false)
     private QdrantDocumentLoader qdrantDocumentLoader;
+
+    /** 兜底应用名截取的字符数（按 codePoint 计，中文 / emoji 都算一个字符） */
+    private static final int FALLBACK_APP_NAME_LENGTH = 10;
+
+    /** 提示词里提不出有效名称时的默认应用名 */
+    private static final String DEFAULT_APP_NAME = "未命名应用";
 
     @Value("${code.deploy-path:http://localhost}")
     private String deployHost;
@@ -120,7 +128,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
      * @return
      */
     @Override
-    @Transactional
     public App createApp(AppAddRequest appAddRequest, HttpServletRequest request, String initPrompt) {
         // 获取当前登录用户
         User loginUser = InnerUserService.getLoginUser(request);
@@ -128,8 +135,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         App app = new App();
         BeanUtil.copyProperties(appAddRequest, app);
         app.setUserId(loginUser.getId());
-        // 应用名由 AI 生成（失败自动降级为本地截取，不阻断创建）
-        app.setAppName(generateAppName(initPrompt));
+        // 应用名先用初始提示词的前 10 个字符占位（同步、零成本），真正的名字由下方虚拟线程异步生成后回填
+        app.setAppName(buildFallbackAppName(initPrompt));
         // 代码生成类型：用户显式指定具体类型时直接使用（创建后不可更改）；
         // 未指定或选择“智能选择(auto)”时，由 AI 根据 initPrompt 路由（保持原有默认行为）。
         AiCodeGenTypeRoutingService routingService = aiCodeGenTypeRoutingServiceFactory.createAiCodeGenTypeRoutingService();
@@ -162,26 +169,73 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         if (quotaBefore <= 0) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "额度不足，请充值后再试");
         }
-        // 单条原子 SQL 扣减（实现见 user-service 的 InnerUserService1Impl）。
-        // 并发请求会在该行排他锁上排队等待，锁释放后重新判断条件，不会失败，故无需重试。
-        boolean deducted = userService.deductQuota(loginUser.getId());
-        if (!deducted) {
-            // 影响行数为 0：并发下额度刚被其他请求扣完（前置校验通过、扣减时已不足）
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "额度不足，请充值后再试");
+        CodeGenTypeEnum finalSelectedCodeGenType = selectedCodeGenType;
+        // 使用编程式事务控制事务粒度
+        App finalApp = transactionTemplate.execute(status -> {
+            // 单条原子 SQL 扣减（实现见 user-service 的 InnerUserService1Impl）。
+            // 并发请求会在该行排他锁上排队等待，锁释放后重新判断条件，不会失败，故无需重试。
+            boolean deducted = userService.deductQuota(loginUser.getId());
+            if (!deducted) {
+                // 影响行数为 0：并发下额度刚被其他请求扣完（前置校验通过、扣减时已不足）
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "额度不足，请充值后再试");
+            }
+            log.info("用户 {} 额度扣减成功，扣减前读到余额: {}", loginUser.getId(), quotaBefore);
+            // 插入数据库
+            boolean result = save(app);
+            if (!result) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "应用创建失败");
+            }
+            log.info("应用创建成功，ID: {}, 类型: {}", app.getId(), finalSelectedCodeGenType.getValue());
+            return app;
+        });
+        //使用虚拟线程异步生成应用名并更新数据库，避免阻塞主线程（创建流程不受影响）
+        updateAppName(initPrompt, finalApp);
+        return finalApp;
+    }
+
+    private void updateAppName(String initPrompt, App finalApp) {
+        Thread.ofVirtual().start(() -> {
+            try {
+                // 异步生成应用名并更新数据库（不影响创建流程）
+                String generatedName = generateAppName(initPrompt);
+                if (StrUtil.isNotBlank(generatedName) && !generatedName.equals(finalApp.getAppName())) {
+                    boolean updateResult = updateChain()
+                            .set(App::getAppName, generatedName)
+                            .where(App::getId).eq(finalApp.getId())
+                            .update();
+                    if (updateResult) {
+                        log.info("应用 ID {} 异步更新生成的应用名: {}", finalApp.getId(), generatedName);
+                    } else {
+                        log.warn("应用 ID {} 异步更新生成的应用名失败: {}", finalApp.getId(), generatedName);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("应用 ID {} 异步生成应用名失败", finalApp.getId(),e);
+            }
+        });
+    }
+
+    /**
+     * 兜底应用名：取初始提示词的前 10 个字符，去掉控制字符与标点。
+     */
+    private String buildFallbackAppName(String initPrompt) {
+        if (StrUtil.isBlank(initPrompt)) {
+            return DEFAULT_APP_NAME;
         }
-        log.info("用户 {} 额度扣减成功，扣减前读到余额: {}", loginUser.getId(), quotaBefore);
-        // 插入数据库
-        boolean result = save(app);
-        if (!result) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR);
-        }
-        log.info("应用创建成功，ID: {}, 类型: {}", app.getId(), selectedCodeGenType.getValue());
-        return app;
+        String trimmed = initPrompt.strip();
+        int codePointCount = trimmed.codePointCount(0, trimmed.length());
+        String head = codePointCount > FALLBACK_APP_NAME_LENGTH
+                ? trimmed.substring(0, trimmed.offsetByCodePoints(0, FALLBACK_APP_NAME_LENGTH))
+                : trimmed;
+        // \p{L} 任意语言的字母（含中文）、\p{N} 数字、\s 空白、\p{So} 符号（emoji 属于这一类）；其余（标点/控制符）去掉
+        String name = head.replaceAll("[^\\p{L}\\p{N}\\s\\p{So}]", "")
+                .replaceAll("\\s+", " ")
+                .strip();
+        return StrUtil.isBlank(name) ? DEFAULT_APP_NAME : name;
     }
 
     /**
      * 使用 AI 生成应用名；失败时降级为本地截取。
-     * <p>
      * 应用名只是"更好的默认值"（用户可在应用编辑页改名），
      * 不能因为一次模型限流/超时就让整个创建流程失败。
      */
@@ -205,8 +259,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         // 本地兜底：截取前 10 个字符，去除换行和特殊字符
         String name = initPrompt.length() > 10 ? initPrompt.substring(0, 10) : initPrompt;
-        return name.replaceAll("[\\r\\n]", "").replaceAll("[^\\w\\s]", "");
+        return name.replaceAll("[^\\p{L}\\p{N}\\s\\p{So}]", "")
+                .replaceAll("\\s+", " ")
+                .strip();
     }
+
 
     /**
      * 聊天生成代码
