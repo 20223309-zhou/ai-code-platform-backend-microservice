@@ -44,6 +44,7 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -299,10 +300,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         // 5.校验上传附件的合法性（类型 / 大小）
         // 注：此处原有一段 routingService.isDesignRelated(intentMessage) 的「是否与网页相关」判断，
-        //    自单体 v4.8.1「支持自选应用生成类型」起已废弃（用户自己选生成类型，不再由 AI 猜），
-        //    且该判断无降级：一次 DNS 抖动就会让整个 chatToGenCode 500。微服务与单体保持一致，停用。
+        //    自单体 v4.8.1「支持自选应用生成类型」起已废弃（用户自己选生成类型，不再由 AI 猜）
         AiCodeGenTypeRoutingService routingService = aiCodeGenTypeRoutingServiceFactory.createAiCodeGenTypeRoutingService();
-        String intentMessage = message;
         if (files != null && files.length > 0) {
             boolean hasImage = false, hasText = false;
             for (MultipartFile f : files) {
@@ -318,16 +317,35 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                     throw new BusinessException(ErrorCode.OPERATION_ERROR, "请上传正确的附件！");
                 }
             }
-            if (hasImage && hasText) intentMessage += " (用户上传了参考图片和需求文档)";
-            else if (hasImage) intentMessage += " (用户上传了参考图片)";
-            else if (hasText) intentMessage += " (用户上传了需求文档)";
         }
-//        boolean designRelated = routingService.isDesignRelated(intentMessage);
-//        designRelated = true;
-//        if (!designRelated) {
-//            throw new BusinessException(ErrorCode.OPERATION_ERROR, "请提供具体的网页修改需求或功能描述。");
-//        }
+        // 6.7. 构建用户消息内容列表和入库的用户会话历史
+        Result result = generateMessage(message, loginUser, files);
+        // 8. 构造多模态 UserMessage
+        UserMessage userMessage = UserMessage.from(result.contents());
+        // 9. 序列化为 JSON 字符串
+        String messageStr = JSONUtil.toJsonStr(result.serializableContents());
 
+        // 10. 通过校验后，添加用户消息到对话历史
+        chatHistoryService.addChatMessage(appId, messageStr, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
+        chatHistoryOriginalService.addOriginalChatMessage(appId, messageStr, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
+        // 11. 注册取消标志
+        cancelGenerationManager.register(appId);
+        // 12. 调用 AI 生成代码（流式）
+        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(userMessage, codeGenTypeEnum, appId, modelName);
+        // 13. 收集 AI 响应内容并在完成后记录到对话历史
+        return streamHandlerExecutor
+                .doExecute(codeStream, chatHistoryService, chatHistoryOriginalService, appId, loginUser, codeGenTypeEnum)
+                .doFinally(signalType -> cancelGenerationManager.remove(appId));
+    }
+
+    /**
+     * 构造入库的信息和用户提示词
+     * @param message
+     * @param loginUser
+     * @param files
+     * @return
+     */
+    private @NonNull Result generateMessage(String message, User loginUser, MultipartFile[] files) {
         // 6. 构建用户消息内容列表
         List<Content> contents = new ArrayList<>();
         TextContent textContent = new TextContent(message);
@@ -374,22 +392,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                 serializableContents.add(contentMap);
             }
         }
-        // 8. 构造多模态 UserMessage
-        UserMessage userMessage = UserMessage.from(contents);
-        // 9. 序列化为 JSON 字符串
-        String messageStr = JSONUtil.toJsonStr(serializableContents);
+        Result result = new Result(contents, serializableContents);
+        return result;
+    }
 
-        // 10. 通过校验后，添加用户消息到对话历史
-        chatHistoryService.addChatMessage(appId, messageStr, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
-        chatHistoryOriginalService.addOriginalChatMessage(appId, messageStr, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
-        // 11. 注册取消标志
-        cancelGenerationManager.register(appId);
-        // 12. 调用 AI 生成代码（流式）
-        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(userMessage, codeGenTypeEnum, appId, modelName);
-        // 13. 收集 AI 响应内容并在完成后记录到对话历史
-        return streamHandlerExecutor
-                .doExecute(codeStream, chatHistoryService, chatHistoryOriginalService, appId, loginUser, codeGenTypeEnum)
-                .doFinally(signalType -> cancelGenerationManager.remove(appId));
+    private record Result(List<Content> contents, List<Map<String, Object>> serializableContents) {
     }
 
     /**
