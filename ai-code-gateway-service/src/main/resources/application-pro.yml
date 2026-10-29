@@ -19,7 +19,7 @@ spring:
             - id: ai-code-user-service
               uri: lb://ai-code-user
               predicates:
-                - Path=/api/user/**
+                - Path=/api/user/**,/api/point/**,/api/announcement/**
 
             - id: ai-code-log-service
               uri: lb://ai-code-log
