@@ -56,7 +56,7 @@ public abstract class BaseTool {
     protected static Path resolveProjectRootDir(Long appId) {
         // 获得输出目录
         Path outputDir = Paths.get(AppConstant.CODE_OUTPUT_ROOT_DIR);
-        String[] prefixes = {"vue_project_", "multi_file_", "html_"};
+        String[] prefixes = {"vue_project_", "react_project_", "multi_file_", "html_"};
         // 尝试匹配前缀
         for (String prefix : prefixes) {
             // 拼接目录的绝对路径

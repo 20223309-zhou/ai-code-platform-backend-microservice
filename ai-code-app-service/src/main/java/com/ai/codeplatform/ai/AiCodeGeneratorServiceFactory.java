@@ -141,7 +141,9 @@ public class AiCodeGeneratorServiceFactory {
         MessageWindowChatMemory chatMemory = getOrCreateChatMemory(appId);
         // 根据代码生成类型选择不同的模型配置
         return switch (codeGenType) {
-            case VUE_PROJECT -> {
+            case VUE_PROJECT, REACT_PROJECT -> {
+                // Vue / React 同属「工程模式」：需要全套文件工具 + 构建工具 + 技能，
+                // 所以共用同一分支，差异只在系统提示词（由调用方方法决定）
                 // 使用多例模式的 StreamingChatModel 解决并发问题
                 StreamingChatModel reasoningStreamingChatModel = resolveStreamingChatModel(modelName);
                 yield withRag(AiServices.builder(AiCodeGeneratorService.class)
@@ -236,7 +238,7 @@ public class AiCodeGeneratorServiceFactory {
     /**
      * 方案预选服务（创建应用前给用户挑设计方案）。
      * <p>
-     * 刻意用单例 + routing 模型 + 零装配（无 tools / 无 ChatMemory / 无 RAG）：
+     * 刻意用单例 + plan 模型（{@code planChatModelPrototype}）+ 零装配（无 tools / 无 ChatMemory / 无 RAG）：
      * <ul>
      *   <li>方案阶段不能产生副作用，挂 tool 会让模型直接开始写文件</li>
      *   <li>不需要隔离并发 —— 一次调用只出几百 token，耗时 1~2 秒，频率极低</li>
@@ -249,7 +251,7 @@ public class AiCodeGeneratorServiceFactory {
      * prototype 的 Bean 在注入时创建一次，之后复用这一个实例 —— 正是单例方案服务需要的语义。
      */
     @Bean
-    public AppPlanService appPlanService(@Qualifier("deepseekChatModelPrototype") ChatModel planChatModel) {
+    public AppPlanService appPlanService(@Qualifier("planChatModelPrototype") ChatModel planChatModel) {
         return AiServices.builder(AppPlanService.class)
                 .chatModel(planChatModel)
                 .build();

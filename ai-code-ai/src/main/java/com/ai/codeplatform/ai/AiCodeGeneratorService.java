@@ -95,4 +95,16 @@ public interface AiCodeGeneratorService {
      */
     @SystemMessage(fromResource = "prompt/codegen-vue-project-system-prompt.txt")
     TokenStream generateVueProjectCodeStream(@MemoryId long appId, @UserMessage String userMessage);
+
+    /**
+     * 生成 React 项目代码（流式）
+     * <p>
+     * 与 Vue 工程模式共用工具链与构建流程（npm install + npm run build），
+     * 差异只在系统提示词：JSX 语法、Hooks 约束、HashRouter 与入口挂载点。
+     *
+     * @param userMessage 用户消息
+     * @return 生成过程的流式响应
+     */
+    @SystemMessage(fromResource = "prompt/codegen-react-project-system-prompt.txt")
+    TokenStream generateReactProjectCodeStream(@MemoryId long appId, @UserMessage String userMessage);
 }

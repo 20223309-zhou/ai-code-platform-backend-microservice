@@ -3,6 +3,7 @@ package com.ai.codeplatform.core;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
+import com.ai.codeplatform.Interceptor.RagSwitchHolder;
 import com.ai.codeplatform.ai.AiCodeGeneratorService;
 import com.ai.codeplatform.ai.AiCodeGeneratorServiceFactory;
 import com.ai.codeplatform.ai.model.message.AiResponseMessage;
@@ -62,6 +63,9 @@ public class AiCodeGeneratorFacade {
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成类型为空");
         }
+        // 告诉 RAG 当前技术栈，检索时按 project_type 过滤，避免检索到其它框架的代码
+        // 取值 html / multi / vue / react，与向量库 metadata 及 SplitExecutor 解析规则一致
+        RagSwitchHolder.setProjectType(codeGenTypeEnum.getValue().split("_")[0]);
         // 根据 appId、生成类型与模型获取对应的 AI 服务实例
         AiCodeGeneratorService aiCodeGeneratorService =
                 aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum, modelName);
@@ -89,6 +93,13 @@ public class AiCodeGeneratorFacade {
                 String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
                 FileUtil.mkdir(projectPath);
                 TokenStream codeStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userText);
+                yield processTokenStream(codeStream, appId);
+            }
+            case REACT_PROJECT -> {
+                // 与 Vue 工程模式同构：独立目录前缀、独立提示词，其余完全复用
+                String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/react_project_" + appId;
+                FileUtil.mkdir(projectPath);
+                TokenStream codeStream = aiCodeGeneratorService.generateReactProjectCodeStream(appId, userText);
                 yield processTokenStream(codeStream, appId);
             }
             default -> {
