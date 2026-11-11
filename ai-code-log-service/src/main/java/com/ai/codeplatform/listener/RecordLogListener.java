@@ -4,6 +4,7 @@ import com.ai.codeplatform.ai.model.entity.SysOperationLog;
 import com.ai.codeplatform.service.SysOperationLogService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.core.ExchangeTypes;
 import org.springframework.amqp.rabbit.annotation.Exchange;
 import org.springframework.amqp.rabbit.annotation.Queue;
@@ -60,7 +61,7 @@ public class RecordLogListener {
         }
         boolean isSuccess = sysOperationLogService.save(logInfo);
         if (!isSuccess) {
-            log.error("{}：接口调用日志写入数据库失败", consumerName);
+            throw new AmqpRejectAndDontRequeueException("日志入库失败: " + logInfo.getId());
         } else {
             log.info("{}：接口调用日志写入数据库成功", consumerName);
         }

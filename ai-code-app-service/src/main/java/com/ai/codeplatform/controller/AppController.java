@@ -5,6 +5,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.ai.codeplatform.ai.AppPlanService;
+import com.ai.codeplatform.ai.model.plan.AppPlan;
 import com.ai.codeplatform.ai.model.plan.PlanListResult;
 import com.ai.codeplatform.annotation.AuthCheck;
 import com.ai.codeplatform.annotation.LogRecord;
@@ -49,6 +50,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -63,6 +65,14 @@ public class AppController {
 
     /** 换方案时最多带几个"已看过"的方案标题给模型，太多会挤占 prompt 且容易让它混乱 */
     private static final int MAX_EXCLUDE_TITLES = 8;
+
+    /**
+     * 整句只有寒暄或乱敲，没有任何页面需求。
+     * 只在整个输入完全匹配时生效，「你好，帮我做个官网」这类带需求的表述仍然走模型。
+     */
+    private static final Pattern SMALL_TALK_PATTERN = Pattern.compile(
+            "^(你好|您好|hi|hello|hey|嗨|哈喽|在吗|在不在|测试|test|ok|好的|谢谢|thanks|早上好|晚上好|晚安)[\\s,，.。!！?？~～、]*$",
+            Pattern.CASE_INSENSITIVE);
 
     @Resource
     private AppService appService;
@@ -189,6 +199,11 @@ public class AppController {
         if (appPlanRequest == null || StrUtil.isBlank(appPlanRequest.getInitPrompt())) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "应用描述不能为空");
         }
+        // 纯问候/测试输入不必打扰模型：直接按「与页面无关」返回，前端会弹确认而不是方案选择
+        PlanListResult smallTalk = buildSmallTalkResult(appPlanRequest.getInitPrompt());
+        if (smallTalk != null) {
+            return ResultUtils.success(smallTalk);
+        }
         PlanListResult result;
         try {
             result = appPlanService.generatePlans(buildPlanPrompt(appPlanRequest));
@@ -233,6 +248,36 @@ public class AppController {
         }
         return prompt + "\n\n【本次需避开的方向】\n" + joined
                 + "\n以上方向用户已经看过或已经采用过，请给出布局结构与交互模式明显不同的新方案。";
+    }
+
+    /**
+     * 纯问候 / 测试输入的兜底结果。不匹配时返回 {@code null}，交给模型判断。
+     *
+     * @param initPrompt 用户原始描述
+     * @return 直接可返回的「与页面无关」结果，或 null
+     */
+    private PlanListResult buildSmallTalkResult(String initPrompt) {
+        String text = StrUtil.trim(initPrompt);
+        if (StrUtil.isBlank(text) || !SMALL_TALK_PATTERN.matcher(text).matches()) {
+            return null;
+        }
+        AppPlan plan = new AppPlan();
+        plan.setId("A");
+        plan.setTitle("按原需求处理");
+        plan.setStyle("不涉及");
+        plan.setLayout("不涉及前端界面");
+        plan.setDesc("当前输入没有描述要做的页面");
+        plan.setTags(List.of("非页面需求"));
+        plan.setRecommended(true);
+
+        PlanListResult result = new PlanListResult();
+        result.setPlans(List.of(plan));
+        // 两个标记都给上：前端据此弹「不是网页需求」的确认框，而不是方案选择框
+        result.setRecommendSkip(true);
+        result.setIrrelevant(true);
+        result.setHint("「" + StrUtil.maxLength(text, 20) + "」看起来不是网页需求，可以补充一句想做什么页面。");
+        log.info("方案预选：识别为问候/测试输入，跳过模型调用，prompt: {}", StrUtil.maxLength(text, 40));
+        return result;
     }
 
     /**
